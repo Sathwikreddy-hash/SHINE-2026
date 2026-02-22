@@ -131,9 +131,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans text-gray-900">
-      {/* Left Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-50 overflow-hidden font-sans text-gray-900">
+      {/* Left Sidebar - Hidden on Mobile */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col">
         <div className="p-6">
           <div className="flex items-center gap-2 text-blue-600 font-bold text-xl mb-8">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -172,23 +172,36 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* Center Content */}
-      <main className="flex-1 flex flex-col bg-white">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col bg-white relative pb-16 md:pb-0">
         {activeTab === 'home' && (
           <>
-            <header className="h-16 border-b border-gray-100 flex items-center justify-between px-6">
-              <h2 className="text-lg font-bold">
-                {selectedChat ? selectedChat.name : 'Recent Messages'}
-              </h2>
+            <header className="h-16 border-b border-gray-100 flex items-center justify-between px-4 md:px-6 sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-3">
+                {selectedChat && (
+                  <button 
+                    onClick={() => setSelectedChat(null)}
+                    className="md:hidden p-2 -ml-2 text-gray-400"
+                  >
+                    <Home size={20} />
+                  </button>
+                )}
+                <h2 className="text-lg font-bold truncate max-w-[200px]">
+                  {selectedChat ? selectedChat.name : 'ShineHub'}
+                </h2>
+              </div>
               {selectedChat && (
-                <div className="flex items-center gap-4">
-                  <button className="text-gray-400 hover:text-gray-600"><Search size={20} /></button>
-                  <button className="text-gray-400 hover:text-gray-600"><MoreVertical size={20} /></button>
+                <div className="flex items-center gap-2 md:gap-4">
+                  <button className="text-gray-400 hover:text-gray-600 p-2"><Search size={20} /></button>
+                  <button className="text-gray-400 hover:text-gray-600 p-2"><MoreVertical size={20} /></button>
                 </div>
               )}
             </header>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div className={cn(
+              "flex-1 overflow-y-auto p-4 md:p-6 space-y-4",
+              selectedChat ? "block" : "hidden md:block"
+            )}>
               {!selectedChat ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
                   <MessageSquare size={48} className="opacity-20" />
@@ -198,13 +211,13 @@ export default function Dashboard() {
                 messages.map((msg, i) => (
                   <div key={i} className={cn("flex", msg.sender_id === user?.id ? "justify-end" : "justify-start")}>
                     <div className={cn(
-                      "max-w-[70%] rounded-2xl p-3 shadow-sm",
+                      "max-w-[85%] md:max-w-[70%] rounded-2xl p-3 shadow-sm",
                       msg.sender_id === user?.id ? "bg-blue-600 text-white rounded-tr-none" : "bg-gray-100 text-gray-800 rounded-tl-none"
                     )}>
                       {selectedChat.type === 'group' && msg.sender_id !== user?.id && (
                         <p className="text-[10px] font-bold mb-1 opacity-70">{msg.sender_name}</p>
                       )}
-                      {msg.content && <p className="text-sm">{msg.content}</p>}
+                      {msg.content && <p className="text-sm leading-relaxed">{msg.content}</p>}
                       {msg.image_url && (
                         <img src={msg.image_url} alt="Shared" className="rounded-lg mt-1 max-w-full h-auto" />
                       )}
@@ -218,16 +231,62 @@ export default function Dashboard() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Chat List on Mobile when no chat selected */}
+            {!selectedChat && (
+              <div className="md:hidden flex-1 overflow-y-auto p-4 space-y-4">
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Recent Chats</h3>
+                {friends.length === 0 && groups.length === 0 && (
+                  <p className="text-center text-gray-400 py-8">No chats yet. Find friends to start!</p>
+                )}
+                {groups.map(group => (
+                  <button 
+                    key={`mob-g-${group.id}`}
+                    onClick={() => {
+                      setSelectedChat({ id: group.id, name: group.name, type: 'group' });
+                      loadMessages({ id: group.id, type: 'group' });
+                    }}
+                    className="w-full flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
+                      {group.name[0]}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-sm">{group.name}</p>
+                      <p className="text-xs text-gray-400">Group Chat</p>
+                    </div>
+                  </button>
+                ))}
+                {friends.map(friend => (
+                  <button 
+                    key={`mob-f-${friend.id}`}
+                    onClick={() => {
+                      setSelectedChat({ id: friend.id, name: friend.name, type: 'private' });
+                      loadMessages({ id: friend.id, type: 'private' });
+                    }}
+                    className="w-full flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl shadow-sm"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                      {friend.name[0]}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-sm">{friend.name}</p>
+                      <p className="text-xs text-gray-400">{friend.class}-{friend.section}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {selectedChat && (
-              <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-100 flex items-center gap-3">
-                <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
+              <form onSubmit={handleSendMessage} className="p-3 md:p-4 border-t border-gray-100 flex items-center gap-2 md:gap-3 bg-white sticky bottom-16 md:bottom-0">
+                <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-2">
                   <ImageIcon size={20} />
                   <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
                 </label>
                 <input
                   type="text"
                   placeholder="Type a message..."
-                  className="flex-1 bg-gray-50 border-none rounded-xl px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="flex-1 bg-gray-50 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   value={inputMessage}
                   onChange={e => setInputMessage(e.target.value)}
                 />
@@ -243,16 +302,16 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'friends' && (
-          <div className="p-8">
-            <h2 className="text-2xl font-bold mb-6">My Friends</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="p-4 md:p-8 overflow-y-auto flex-1">
+            <h2 className="text-xl md:text-2xl font-bold mb-6">My Friends</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {friends.map(friend => (
                 <div key={friend.id} className="bg-white border border-gray-100 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
                   <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
                     {friend.name[0]}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold">{friend.name}</p>
+                    <p className="font-semibold text-sm md:text-base">{friend.name}</p>
                     <p className="text-xs text-gray-400">{friend.class}-{friend.section}</p>
                   </div>
                   <button 
@@ -267,29 +326,58 @@ export default function Dashboard() {
                   </button>
                 </div>
               ))}
+              {friends.length === 0 && (
+                <div className="col-span-full text-center py-12 text-gray-400">
+                  <Users size={48} className="mx-auto mb-4 opacity-20" />
+                  <p>You haven't followed any classmates yet.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-12 md:hidden">
+              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Students You May Know</h3>
+              <div className="space-y-4">
+                {suggestedUsers.map(sUser => (
+                  <div key={`mob-s-${sUser.id}`} className="flex items-center gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                      {sUser.name[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">{sUser.name}</p>
+                      <p className="text-xs text-gray-400">{sUser.class}-{sUser.section}</p>
+                    </div>
+                    <button 
+                      onClick={() => followUser(sUser.id)}
+                      className="p-2 bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                    >
+                      <UserPlus size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
 
         {activeTab === 'groups' && (
-          <div className="p-8">
+          <div className="p-4 md:p-8 overflow-y-auto flex-1">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Groups</h2>
+              <h2 className="text-xl md:text-2xl font-bold">Groups</h2>
               <button 
                 onClick={() => setShowCreateGroup(true)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-medium hover:bg-blue-700 transition-all"
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-xl font-medium hover:bg-blue-700 transition-all text-sm md:text-base"
               >
-                <PlusCircle size={18} /> Create Group
+                <PlusCircle size={18} /> Create
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {groups.map(group => (
                 <div key={group.id} className="bg-white border border-gray-100 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
                   <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold">
                     {group.name[0]}
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold">{group.name}</p>
+                    <p className="font-semibold text-sm md:text-base">{group.name}</p>
                     <p className="text-xs text-gray-400">Group Chat</p>
                   </div>
                   <button 
@@ -304,45 +392,67 @@ export default function Dashboard() {
                   </button>
                 </div>
               ))}
+              {groups.length === 0 && (
+                <div className="col-span-full text-center py-12 text-gray-400">
+                  <PlusCircle size={48} className="mx-auto mb-4 opacity-20" />
+                  <p>No groups joined yet.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {activeTab === 'settings' && (
-          <div className="p-8 max-w-2xl mx-auto w-full">
-            <h2 className="text-2xl font-bold mb-8">Settings</h2>
+          <div className="p-4 md:p-8 max-w-2xl mx-auto w-full overflow-y-auto flex-1">
+            <h2 className="text-xl md:text-2xl font-bold mb-8">Settings</h2>
             <div className="space-y-6">
-              <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+              <div className="bg-white border border-gray-100 p-5 md:p-6 rounded-2xl shadow-sm">
                 <h3 className="font-bold mb-4">Profile Information</h3>
-                <div className="flex items-center gap-6 mb-6">
-                  <div className="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-3xl font-bold">
+                <div className="flex items-center gap-4 md:gap-6 mb-6">
+                  <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-2xl md:text-3xl font-bold">
                     {user?.name[0]}
                   </div>
-                  <button className="text-blue-600 font-medium hover:underline">Change Photo</button>
+                  <button className="text-blue-600 font-medium hover:underline text-sm md:text-base">Change Photo</button>
                 </div>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Full Name</label>
-                    <p className="font-medium">{user?.name}</p>
+                    <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider font-bold">Full Name</label>
+                    <p className="font-medium text-sm md:text-base">{user?.name}</p>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Class & Section</label>
-                    <p className="font-medium">{user?.class} - {user?.section}</p>
+                    <label className="block text-xs text-gray-400 mb-1 uppercase tracking-wider font-bold">Class & Section</label>
+                    <p className="font-medium text-sm md:text-base">{user?.class} - {user?.section}</p>
                   </div>
                 </div>
               </div>
               
-              <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+              <div className="bg-white border border-gray-100 p-5 md:p-6 rounded-2xl shadow-sm">
                 <h3 className="font-bold mb-4 text-red-500">Danger Zone</h3>
-                <button className="text-red-500 font-medium hover:underline">Delete Account</button>
+                <div className="space-y-4">
+                  <button 
+                    onClick={logout}
+                    className="w-full py-3 border border-red-100 text-red-500 rounded-xl font-medium hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={18} /> Log Out
+                  </button>
+                  <button className="w-full py-3 text-gray-400 text-sm font-medium hover:underline">Delete Account</button>
+                </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Bottom Navigation for Mobile */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex items-center justify-around h-16 px-2 z-20">
+          <MobileNavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedChat(null); }} icon={<Home size={22} />} label="Home" />
+          <MobileNavItem active={activeTab === 'friends'} onClick={() => setActiveTab('friends')} icon={<Users size={22} />} label="Friends" />
+          <MobileNavItem active={activeTab === 'groups'} onClick={() => setActiveTab('groups')} icon={<PlusCircle size={22} />} label="Groups" />
+          <MobileNavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={22} />} label="Settings" />
+        </nav>
       </main>
 
-      {/* Right Sidebar */}
-      <aside className="w-80 bg-gray-50 border-l border-gray-100 p-6 overflow-y-auto hidden xl:block">
+      {/* Right Sidebar - Hidden on Mobile */}
+      <aside className="hidden xl:block w-80 bg-gray-50 border-l border-gray-100 p-6 overflow-y-auto">
         <div className="mb-8">
           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Students You May Know</h3>
           <div className="space-y-4">
@@ -390,12 +500,12 @@ export default function Dashboard() {
       {/* Create Group Modal */}
       <AnimatePresence>
         {showCreateGroup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"
+              className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl"
             >
               <h3 className="text-xl font-bold mb-6">Create New Group</h3>
               <div className="space-y-4">
@@ -425,6 +535,9 @@ export default function Dashboard() {
                         <span className="text-sm font-medium">{friend.name}</span>
                       </label>
                     ))}
+                    {friends.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-4">No friends to add yet.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -466,3 +579,19 @@ function NavItem({ active, icon, label, onClick }: { active: boolean; icon: Reac
     </button>
   );
 }
+
+function MobileNavItem({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center justify-center flex-1 h-full transition-all gap-1",
+        active ? "text-blue-600" : "text-gray-400"
+      )}
+    >
+      {icon}
+      <span className="text-[10px] font-bold uppercase tracking-tighter">{label}</span>
+    </button>
+  );
+}
+

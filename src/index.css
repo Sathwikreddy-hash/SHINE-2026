@@ -6,5 +6,30 @@
 }
 
 body {
-  @apply font-sans antialiased;
+  @apply font-sans antialiased bg-gray-50;
+  /* Prevent overscroll bounce on mobile for a more app-like feel */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Custom scrollbar for a cleaner look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full;
+}
+
+/* Ensure full height on mobile browsers */
+.min-h-screen {
+  min-height: 100dvh;
+}
+
+.h-screen {
+  height: 100dvh;
 }

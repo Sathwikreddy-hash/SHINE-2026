@@ -50,7 +50,9 @@ export default function Admin() {
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               <Users className="w-5 h-5" /> All Students
             </h2>
-            <div className="overflow-x-auto">
+            
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-gray-400 text-sm border-b border-gray-50">
@@ -95,6 +97,41 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {users.map(u => (
+                <div key={`mob-u-${u.id}`} className="p-4 border border-gray-50 rounded-xl space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold">{u.name}</p>
+                      <p className="text-xs text-gray-400">@{u.username}</p>
+                    </div>
+                    {u.is_banned ? (
+                      <span className="px-2 py-1 bg-red-50 text-red-500 rounded-full text-[10px] font-bold uppercase">Banned</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-green-50 text-green-500 rounded-full text-[10px] font-bold uppercase">Active</span>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                    <p className="text-sm text-gray-500">{u.class}-{u.section}</p>
+                    <div className="flex gap-2">
+                      {!u.is_banned && (
+                        <button 
+                          onClick={() => handleBan(u.id)}
+                          className="p-2 bg-red-50 text-red-500 rounded-lg"
+                        >
+                          <Ban size={16} />
+                        </button>
+                      )}
+                      <button className="p-2 bg-gray-50 text-gray-400 rounded-lg">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
 
