@@ -29,6 +29,7 @@ db.exec(`
     profile_photo TEXT,
     role TEXT DEFAULT 'user',
     is_banned INTEGER DEFAULT 0,
+    last_login DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -94,6 +95,25 @@ db.exec(`
     data TEXT,
     is_read INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    admin_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS notice_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    notice_id INTEGER,
+    user_id INTEGER,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (notice_id) REFERENCES notices(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
@@ -165,11 +185,28 @@ app.post('/api/auth/register', (req, res) => {
 // Login
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
+  console.log(`Login attempt for username: ${username}`);
+  
   const user: any = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
-  if (!user || !bcrypt.compareSync(password, user.password)) {
+  
+  if (!user) {
+    console.log(`User not found: ${username}`);
     return res.status(400).json({ error: 'Invalid credentials' });
   }
-  if (user.is_banned) return res.status(403).json({ error: 'Your account has been banned' });
+
+  const isPasswordMatch = bcrypt.compareSync(password, user.password);
+  if (!isPasswordMatch) {
+    console.log(`Password mismatch for user: ${username}`);
+    return res.status(400).json({ error: 'Invalid credentials' });
+  }
+
+  if (user.is_banned) {
+    console.log(`Banned user attempted login: ${username}`);
+    return res.status(403).json({ error: 'Your account has been banned' });
+  }
+  
+  // Update last login
+  db.prepare('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?').run(user.id);
   
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET);
   res.json({ token, user: { id: user.id, username: user.username, name: user.name, class: user.class, section: user.section, role: user.role } });
@@ -280,8 +317,63 @@ app.post('/api/reports', authenticate, (req: any, res) => {
 // Admin Routes
 app.get('/api/admin/users', authenticate, (req: any, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
-  const users = db.prepare('SELECT id, name, username, class, section, role, is_banned FROM users').all();
+  const users = db.prepare('SELECT id, name, username, class, section, role, is_banned, last_login FROM users').all();
   res.json(users);
+});
+
+app.delete('/api/admin/users/:id', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  
+  const userId = req.params.id;
+  
+  // Start a transaction to delete user data
+  const deleteTx = db.transaction(() => {
+    db.prepare('DELETE FROM follows WHERE follower_id = ? OR following_id = ?').run(userId, userId);
+    db.prepare('DELETE FROM group_members WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?').run(userId, userId);
+    db.prepare('DELETE FROM notice_comments WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM reports WHERE reporter_id = ? OR reported_user_id = ?').run(userId, userId);
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+  });
+  
+  deleteTx();
+  res.json({ success: true });
+});
+
+// Notice Board Routes
+app.get('/api/notices', authenticate, (req: any, res) => {
+  const notices = db.prepare(`
+    SELECT n.*, u.name as admin_name 
+    FROM notices n
+    JOIN users u ON n.admin_id = u.id
+    ORDER BY created_at DESC
+  `).all();
+  res.json(notices);
+});
+
+app.post('/api/notices', authenticate, (req: any, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  const { title, content } = req.body;
+  const result = db.prepare('INSERT INTO notices (title, content, admin_id) VALUES (?, ?, ?)').run(title, content, req.user.id);
+  res.json({ id: result.lastInsertRowid, title, content });
+});
+
+app.get('/api/notices/:id/comments', authenticate, (req: any, res) => {
+  const comments = db.prepare(`
+    SELECT nc.*, u.name as user_name 
+    FROM notice_comments nc
+    JOIN users u ON nc.user_id = u.id
+    WHERE notice_id = ?
+    ORDER BY created_at ASC
+  `).all(req.params.id);
+  res.json(comments);
+});
+
+app.post('/api/notices/:id/comments', authenticate, (req: any, res) => {
+  const { content } = req.body;
+  const result = db.prepare('INSERT INTO notice_comments (notice_id, user_id, content) VALUES (?, ?, ?)').run(req.params.id, req.user.id, content);
+  res.json({ id: result.lastInsertRowid, content });
 });
 
 app.post('/api/admin/ban/:id', authenticate, (req: any, res) => {

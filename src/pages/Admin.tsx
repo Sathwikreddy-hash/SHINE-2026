@@ -33,20 +33,37 @@ export default function Admin() {
     fetchAdminData();
   };
 
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to permanently delete this user and all their data?')) return;
+    await fetch(`/api/admin/users/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    fetchAdminData();
+  };
+
   if (user?.role !== 'admin') {
     return <div className="p-8 text-center">Unauthorized</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center gap-3 mb-8">
-          <Shield className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Shield className="w-8 h-8 text-blue-600" />
+            <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
+          </div>
+          <button 
+            onClick={() => window.location.href = '/dashboard'}
+            className="text-sm text-gray-500 hover:text-blue-600 font-medium"
+          >
+            Back to App
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <section className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               <Users className="w-5 h-5" /> All Students
             </h2>
@@ -58,11 +75,17 @@ export default function Admin() {
                   <tr className="text-gray-400 text-sm border-b border-gray-50">
                     <th className="pb-4 font-medium">Name</th>
                     <th className="pb-4 font-medium">Class</th>
+                    <th className="pb-4 font-medium">Last Login</th>
                     <th className="pb-4 font-medium">Status</th>
                     <th className="pb-4 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-gray-400">No students registered yet.</td>
+                    </tr>
+                  )}
                   {users.map(u => (
                     <tr key={u.id} className="text-sm">
                       <td className="py-4">
@@ -70,6 +93,9 @@ export default function Admin() {
                         <p className="text-xs text-gray-400">@{u.username}</p>
                       </td>
                       <td className="py-4">{u.class}-{u.section}</td>
+                      <td className="py-4 text-xs text-gray-500">
+                        {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
+                      </td>
                       <td className="py-4">
                         {u.is_banned ? (
                           <span className="px-2 py-1 bg-red-50 text-red-500 rounded-full text-[10px] font-bold uppercase">Banned</span>
@@ -79,7 +105,7 @@ export default function Admin() {
                       </td>
                       <td className="py-4">
                         <div className="flex gap-2">
-                          {!u.is_banned && (
+                          {!u.is_banned && u.role !== 'admin' && (
                             <button 
                               onClick={() => handleBan(u.id)}
                               className="p-2 text-gray-400 hover:text-red-500 transition-colors"
@@ -88,9 +114,15 @@ export default function Admin() {
                               <Ban size={16} />
                             </button>
                           )}
-                          <button className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Delete Account">
-                            <Trash2 size={16} />
-                          </button>
+                          {u.role !== 'admin' && (
+                            <button 
+                              onClick={() => handleDelete(u.id)}
+                              className="p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                              title="Delete Account"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -114,10 +146,13 @@ export default function Admin() {
                       <span className="px-2 py-1 bg-green-50 text-green-500 rounded-full text-[10px] font-bold uppercase">Active</span>
                     )}
                   </div>
+                  <div className="text-xs text-gray-500">
+                    Last Login: {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
+                  </div>
                   <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                     <p className="text-sm text-gray-500">{u.class}-{u.section}</p>
                     <div className="flex gap-2">
-                      {!u.is_banned && (
+                      {!u.is_banned && u.role !== 'admin' && (
                         <button 
                           onClick={() => handleBan(u.id)}
                           className="p-2 bg-red-50 text-red-500 rounded-lg"
@@ -125,9 +160,14 @@ export default function Admin() {
                           <Ban size={16} />
                         </button>
                       )}
-                      <button className="p-2 bg-gray-50 text-gray-400 rounded-lg">
-                        <Trash2 size={16} />
-                      </button>
+                      {u.role !== 'admin' && (
+                        <button 
+                          onClick={() => handleDelete(u.id)}
+                          className="p-2 bg-gray-50 text-gray-400 rounded-lg"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

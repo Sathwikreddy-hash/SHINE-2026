@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Home, Users, MessageSquare, PlusCircle, Settings, LogOut, 
   Search, Send, Image as ImageIcon, MoreVertical, ShieldAlert,
-  UserCheck, UserPlus, Trash2
+  UserCheck, UserPlus, Trash2, Megaphone, MessageCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -27,13 +27,62 @@ export default function Dashboard() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
+  const [notices, setNotices] = useState<any[]>([]);
+  const [showCreateNotice, setShowCreateNotice] = useState(false);
+  const [newNotice, setNewNotice] = useState({ title: '', content: '' });
+  const [noticeComments, setNoticeComments] = useState<{ [key: number]: any[] }>({});
+  const [newComment, setNewComment] = useState<{ [key: number]: string }>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (token) {
       fetchData();
+      fetchNotices();
     }
   }, [token]);
+
+  const fetchNotices = async () => {
+    const res = await fetch('/api/notices', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    setNotices(data);
+    data.forEach((notice: any) => fetchComments(notice.id));
+  };
+
+  const fetchComments = async (noticeId: number) => {
+    const res = await fetch(`/api/notices/${noticeId}/comments`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    setNoticeComments(prev => ({ ...prev, [noticeId]: data }));
+  };
+
+  const createNotice = async () => {
+    if (!newNotice.title || !newNotice.content) return;
+    await fetch('/api/notices', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify(newNotice)
+    });
+    setNewNotice({ title: '', content: '' });
+    setShowCreateNotice(false);
+    fetchNotices();
+  };
+
+  const addComment = async (noticeId: number) => {
+    const content = newComment[noticeId];
+    if (!content) return;
+    await fetch(`/api/notices/${noticeId}/comments`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}` 
+      },
+      body: JSON.stringify({ content })
+    });
+    setNewComment(prev => ({ ...prev, [noticeId]: '' }));
+    fetchComments(noticeId);
+  };
 
   useEffect(() => {
     if (lastMessage?.type === 'new_message') {
@@ -190,6 +239,14 @@ export default function Dashboard() {
                   {selectedChat ? selectedChat.name : 'ShineHub'}
                 </h2>
               </div>
+              {!selectedChat && user?.role === 'admin' && (
+                <button 
+                  onClick={() => setShowCreateNotice(true)}
+                  className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2"
+                >
+                  <Megaphone size={16} /> Post Notice
+                </button>
+              )}
               {selectedChat && (
                 <div className="flex items-center gap-2 md:gap-4">
                   <button className="text-gray-400 hover:text-gray-600 p-2"><Search size={20} /></button>
@@ -199,13 +256,97 @@ export default function Dashboard() {
             </header>
 
             <div className={cn(
-              "flex-1 overflow-y-auto p-4 md:p-6 space-y-4",
+              "flex-1 overflow-y-auto p-4 md:p-6 space-y-6",
               selectedChat ? "block" : "hidden md:block"
             )}>
               {!selectedChat ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4">
-                  <MessageSquare size={48} className="opacity-20" />
-                  <p>Select a classmate to start chatting</p>
+                <div className="space-y-8">
+                  {/* Notice Board Section */}
+                  <section>
+                    <div className="flex items-center gap-2 mb-6">
+                      <Megaphone className="text-blue-600" size={24} />
+                      <h3 className="text-2xl font-bold">Notice Board</h3>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      {notices.length === 0 && (
+                        <div className="bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-12 text-center text-gray-400">
+                          No official notices yet.
+                        </div>
+                      )}
+                      {notices.map(notice => (
+                        <motion.div 
+                          key={notice.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="bg-blue-600 text-white rounded-3xl p-6 md:p-8 shadow-xl shadow-blue-100 relative overflow-hidden"
+                        >
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+                          
+                          <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-4">
+                              <h4 className="text-2xl md:text-3xl font-bold">{notice.title}</h4>
+                              <span className="text-[10px] uppercase tracking-widest bg-white/20 px-2 py-1 rounded-full font-bold">
+                                Official
+                              </span>
+                            </div>
+                            <p className="text-blue-50 text-lg leading-relaxed mb-6 whitespace-pre-wrap">
+                              {notice.content}
+                            </p>
+                            <div className="flex items-center justify-between text-blue-100 text-xs border-t border-white/20 pt-4">
+                              <p>Posted by {notice.admin_name}</p>
+                              <p>{new Date(notice.created_at).toLocaleDateString()}</p>
+                            </div>
+
+                            {/* Comments Section */}
+                            <div className="mt-6 bg-white/10 rounded-2xl p-4">
+                              <h5 className="text-sm font-bold mb-3 flex items-center gap-2">
+                                <MessageCircle size={16} /> Comments
+                              </h5>
+                              <div className="space-y-3 max-h-40 overflow-y-auto mb-4 pr-2 custom-scrollbar">
+                                {(noticeComments[notice.id] || []).map((comment: any) => (
+                                  <div key={comment.id} className="bg-white/10 rounded-xl p-2.5">
+                                    <p className="text-[10px] font-bold text-blue-200">{comment.user_name}</p>
+                                    <p className="text-sm">{comment.content}</p>
+                                  </div>
+                                ))}
+                                {(!noticeComments[notice.id] || noticeComments[notice.id].length === 0) && (
+                                  <p className="text-xs text-blue-200 italic">No comments yet.</p>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text"
+                                  placeholder="Write a comment..."
+                                  className="flex-1 bg-white/20 border-none rounded-lg px-3 py-1.5 text-sm placeholder:text-blue-200 outline-none focus:ring-1 focus:ring-white/50"
+                                  value={newComment[notice.id] || ''}
+                                  onChange={e => setNewComment(prev => ({ ...prev, [notice.id]: e.target.value }))}
+                                  onKeyPress={e => e.key === 'Enter' && addComment(notice.id)}
+                                />
+                                <button 
+                                  onClick={() => addComment(notice.id)}
+                                  className="bg-white text-blue-600 p-1.5 rounded-lg hover:bg-blue-50 transition-colors"
+                                >
+                                  <Send size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section>
+                    <div className="flex items-center gap-2 mb-4">
+                      <MessageSquare className="text-gray-400" size={20} />
+                      <h3 className="text-lg font-bold text-gray-400">Recent Activity</h3>
+                    </div>
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400 space-y-4">
+                      <MessageSquare size={48} className="opacity-20" />
+                      <p>Select a classmate to start chatting</p>
+                    </div>
+                  </section>
                 </div>
               ) : (
                 messages.map((msg, i) => (
@@ -553,6 +694,60 @@ export default function Dashboard() {
                   className="flex-1 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
                 >
                   Create
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Notice Modal */}
+      <AnimatePresence>
+        {showCreateNotice && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-md shadow-2xl"
+            >
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <Megaphone className="text-blue-600" size={20} /> Post Official Notice
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notice Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Sports Day Announcement"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    value={newNotice.title}
+                    onChange={e => setNewNotice({ ...newNotice, title: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
+                  <textarea
+                    rows={4}
+                    placeholder="Write the notice details here..."
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    value={newNotice.content}
+                    onChange={e => setNewNotice({ ...newNotice, content: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-8">
+                <button 
+                  onClick={() => setShowCreateNotice(false)}
+                  className="flex-1 py-2 text-gray-400 font-medium hover:bg-gray-50 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={createNotice}
+                  className="flex-1 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                >
+                  Post Notice
                 </button>
               </div>
             </motion.div>
